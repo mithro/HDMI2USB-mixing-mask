@@ -6,6 +6,7 @@ from collections import namedtuple
 _RepeatBase = namedtuple('repeat', ['count','contents'])
 
 class Repeat(_RepeatBase):
+	"""Repeat class inherits from the _RepeatBase namedtuple"""
 
 	def generate(self):
 		return self.count*self.contents.gen()
