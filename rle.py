@@ -35,7 +35,7 @@ class Pixel(int):
         >>> Pixel(0x10).encode()
         '\\x02\\x10\\x10\\x10'
         """
-        return struct.pack("BBBB", PIXEL_OP, self, self, self)
+        return struct.pack("<BBBB", PIXEL_OP, self, self, self)
 
 
 WHITE=Pixel(255)
@@ -74,13 +74,45 @@ class Repeat(_RepeatBase):
         '\\x01\\x00\\x01\\x00'
         >>> Repeat(2, [Pixel(0)]).encode()
         '\\x01\\x01\\x02\\x00\\x02\\x00\\x00\\x00'
-        >>> Repeat(3000, [Repeat(2000, [Pixel(01)]), Pixel(12), Pixel(23)]).encode()
+        >>> Repeat(3000, [Repeat(2000, [Pixel(1)]), Pixel(12), Pixel(23)]).encode()
         '\\x01\\x03\\xb8\\x0b\\x01\\x01\\xd0\\x07\\x02\\x01\\x01\\x01\\x02\\x0c\\x0c\\x0c\\x02\\x17\\x17\\x17'
         """
-        data = [struct.pack("BBH", REPEAT_OP, len(self.contents), self.count)]
+        data = [struct.pack("<BBH", REPEAT_OP, len(self.contents), self.count)]
+        assert len(data[0]) == 4
         for i in self.contents:
             data.append(i.encode())
         return "".join(data)
+
+
+def DecodeBytes(data):
+    """
+    >>> DecodeBytes('\\x01\\x00\\x01\\x00')
+    (Repeat(1, []), '')
+    >>> DecodeBytes('\\x02\\x00\\x00\\x00')
+    (Pixel(0), '')
+    >>> DecodeBytes('\\x01\\x01\\x02\\x00\\x02\\x00\\x00\\x00')
+    (Repeat(2, [Pixel(0)]), '')
+    >>> DecodeBytes('\\x01\\x03\\xb8\\x0b\\x01\\x01\\xd0\\x07\\x02\\x01\\x01\\x01\\x02\\x0c\\x0c\\x0c\\x02\\x17\\x17\\x17')
+    (Repeat(3000, [Repeat(2000, [Pixel(1)]), Pixel(12), Pixel(23)]), '')
+    """
+    op, data = data[:4], data[4:]
+    assert len(op) == 4, op
+    optype, = struct.unpack("B", op[0])
+    if optype == PIXEL_OP:
+        r, g, b, = struct.unpack("<BBB", op[1:])
+        assert r == g == b
+        return Pixel(r), data
+    elif optype == REPEAT_OP:
+        elements, times = struct.unpack("<BH", op[1:])
+        assert elements >= 0
+        assert times >= 0
+        contents = []
+        for i in range(0, elements):
+            a, data = DecodeBytes(data)
+            contents.append(a)
+        return Repeat(times, contents), data
+    assert False, (optype, data)
+
 
 
 #Template([Repeat(720, lambda t: 1280-t, [BLACK]), Repeat(lambda t: t, [WHITE]))])
