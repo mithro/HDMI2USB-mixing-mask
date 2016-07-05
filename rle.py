@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 # vim: set ts=4 sw=4 et sts=4 ai:
 
+import struct
 from collections import namedtuple
+
+REPEAT_OP = 1
+PIXEL_OP = 2
+
 
 class Pixel(int):
     """
@@ -22,6 +27,15 @@ class Pixel(int):
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__, int.__repr__(self))
+
+    def encode(self):
+        """
+        >>> Pixel(0).encode()
+        '\\x02\\x00\\x00\\x00'
+        >>> Pixel(0x10).encode()
+        '\\x02\\x10\\x10\\x10'
+        """
+        return struct.pack("BBBB", PIXEL_OP, self, self, self)
 
 
 WHITE=Pixel(255)
@@ -53,6 +67,20 @@ class Repeat(_RepeatBase):
 
     def __repr__(self):
         return "Repeat(%r, %r)" % (self.count, self.contents)
+
+    def encode(self):
+        """
+        >>> Repeat(1, []).encode()
+        '\\x01\\x00\\x01\\x00'
+        >>> Repeat(2, [Pixel(0)]).encode()
+        '\\x01\\x01\\x02\\x00\\x02\\x00\\x00\\x00'
+        >>> Repeat(3000, [Repeat(2000, [Pixel(01)]), Pixel(12), Pixel(23)]).encode()
+        '\\x01\\x03\\xb8\\x0b\\x01\\x01\\xd0\\x07\\x02\\x01\\x01\\x01\\x02\\x0c\\x0c\\x0c\\x02\\x17\\x17\\x17'
+        """
+        data = [struct.pack("BBH", REPEAT_OP, len(self.contents), self.count)]
+        for i in self.contents:
+            data.append(i.encode())
+        return "".join(data)
 
 
 #Template([Repeat(720, lambda t: 1280-t, [BLACK]), Repeat(lambda t: t, [WHITE]))])
